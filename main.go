@@ -11,14 +11,16 @@ import (
 
 func main() {
 	http.HandleFunc("/user/create", createUser)
+	http.HandleFunc("/user/get", getUser)
 
+	// データ表示
 	db, err := sql.Open("mysql", "root:@/techtrain-mission-gameapi")
 	if err != nil {
 		panic(err.Error())
 	}
 	defer db.Close()
 
-	rows, err := db.Query("SELECT * FROM user") //
+	rows, err := db.Query("SELECT * FROM user")
 	if err != nil {
 		panic(err.Error())
 	}
@@ -53,6 +55,7 @@ func main() {
 		}
 		fmt.Println("-----------------------------------")
 	}
+
 	if err := http.ListenAndServe(":8080", nil); err != nil {
 		log.Fatal("ListenAndServe:", err)
 	}

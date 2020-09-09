@@ -6,12 +6,11 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math/rand"
 	"net/http"
 	"strconv"
 
 	_ "github.com/go-sql-driver/mysql"
-
-	"github.com/dgrijalva/jwt-go"
 )
 
 type User struct {
@@ -20,27 +19,22 @@ type User struct {
 }
 
 func getUserData(w http.ResponseWriter, r *http.Request) User {
-	//To allocate slice for request body
+
 	length, err := strconv.Atoi(r.Header.Get("Content-Length"))
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		// return
 	}
 
-	//Read body data to parse json
 	body := make([]byte, length)
 	length, err = r.Body.Read(body)
 	if err != nil && err != io.EOF {
 		w.WriteHeader(http.StatusInternalServerError)
-		// return
 	}
 
-	//parse json
 	var user User
 	err = json.Unmarshal(body[:length], &user)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		// return
 	}
 	return user
 }
@@ -66,25 +60,44 @@ func insertData(user User) {
 func createUser(w http.ResponseWriter, r *http.Request) {
 	user := getUserData(w, r)
 
-	// 鍵となる文字列(多分なんでもいい)
-	secret := "secret"
+	// jwt版
+	// secret := "secret"
 
-	// Token を作成
-	// jwt -> JSON Web Token - JSON をセキュアにやり取りするための仕様
-	// jwtの構造 -> {Base64 encoded Header}.{Base64 encoded Payload}.{Signature}
-	// HS254 -> 証明生成用(https://ja.wikipedia.org/wiki/JSON_Web_Token)
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"name": user.Name,
-		"iss":  "__init__", // JWT の発行者が入る(文字列(__init__)は任意)
-	})
+	// token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+	// 	"name": user.Name,
+	// 	"iss":  "__init__",
+	// })
 
-	//Dumpを吐く
-	// spew.Dump(token)
+	// tokenString, _ := token.SignedString([]byte(secret))
+	// user.Token = tokenString
+	//
 
-	tokenString, _ := token.SignedString([]byte(secret))
-	user.Token = tokenString
+	// ランダム文字列版
+	var letter = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+
+	b := make([]rune, 20)
+	for i := range b {
+		b[i] = letter[rand.Intn(len(letter))]
+	}
+	user.Token = string(b)
+	//
 
 	insertData(user)
 	fmt.Print(user)
 
+}
+
+func getUser(w http.ResponseWriter, r *http.Request) {
+	token := r.Header.Get("x-token")
+	db, err := sql.Open("mysql", "root:@/techtrain-mission-gameapi")
+	if err != nil {
+		panic(err.Error())
+	}
+	defer db.Close()
+
+	var res string
+	if err := db.QueryRow("SELECT name FROM user WHERE token=?;", token).Scan(&res); err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("name:", res)
 }
