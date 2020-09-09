@@ -95,9 +95,35 @@ func getUser(w http.ResponseWriter, r *http.Request) {
 	}
 	defer db.Close()
 
-	var res string
-	if err := db.QueryRow("SELECT name FROM user WHERE token=?;", token).Scan(&res); err != nil {
+	var result string
+	if err := db.QueryRow("SELECT name FROM user WHERE token=?;", token).Scan(&result); err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println("name:", res)
+	fmt.Println("name:", result)
+}
+
+func updateUser(w http.ResponseWriter, r *http.Request) {
+	token := r.Header.Get("x-token")
+	db, err := sql.Open("mysql", "root:@/techtrain-mission-gameapi")
+	if err != nil {
+		panic(err.Error())
+	}
+	defer db.Close()
+
+	var result string
+	if err := db.QueryRow("SELECT name FROM user WHERE token=?;", token).Scan(&result); err != nil && err != sql.ErrNoRows {
+		log.Fatal(err)
+	}
+
+	user := getUserData(w, r)
+	user.Token = token
+
+	upd, err := db.Prepare("UPDATE user set name=? WHERE token=?;")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	upd.Exec(user.Name, user.Token)
+
+	fmt.Println("updated", user.Name, user.Token)
 }

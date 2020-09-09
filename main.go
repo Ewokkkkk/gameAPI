@@ -12,6 +12,7 @@ import (
 func main() {
 	http.HandleFunc("/user/create", createUser)
 	http.HandleFunc("/user/get", getUser)
+	http.HandleFunc("/user/update", updateUser)
 
 	// データ表示
 	db, err := sql.Open("mysql", "root:@/techtrain-mission-gameapi")
