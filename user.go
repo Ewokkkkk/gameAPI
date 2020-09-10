@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"net/http"
 	"strconv"
+	"time"
 
 	_ "github.com/go-sql-driver/mysql"
 )
@@ -23,19 +24,17 @@ func getUserData(w http.ResponseWriter, r *http.Request) User {
 
 	length, err := strconv.Atoi(r.Header.Get("Content-Length"))
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
+		log.Fatalln("データが受け取れません -", err)
 	}
-
 	body := make([]byte, length)
 	length, err = r.Body.Read(body)
 	if err != nil && err != io.EOF {
-		w.WriteHeader(http.StatusInternalServerError)
+		log.Fatalln("データが受け取れません -", err)
 	}
-
 	var user User
 	err = json.Unmarshal(body[:length], &user)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
+		log.Fatalln("データが受け取れません -", err)
 	}
 	return user
 }
@@ -50,11 +49,11 @@ func insertData(user User) {
 
 	ins, err := db.Prepare("INSERT INTO user(name, token) VALUES(?,?)")
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalln(err)
 	}
 	_, err = ins.Exec(user.Name, user.Token)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalln(err)
 	}
 	fmt.Println("inserted", user.Name, user.Token)
 }
@@ -63,6 +62,26 @@ func insertData(user User) {
 func createUser(w http.ResponseWriter, r *http.Request) {
 	user := getUserData(w, r)
 
+	user.Token = createToken()
+
+	db, err := sql.Open("mysql", "root:@/techtrain-mission-gameapi")
+	if err != nil {
+		panic(err.Error())
+	}
+	defer db.Close()
+
+	// tokenが重複した場合、再生成
+	var result string
+	for db.QueryRow("SELECT name FROM user WHERE token=?;", user.Token).Scan(&result) == nil {
+		fmt.Println("トークン:", user.Token, "が重複しました。再生成します")
+		user.Token = createToken()
+	}
+
+	insertData(user)
+	fmt.Println(user)
+}
+
+func createToken() string {
 	// jwt版
 	// secret := "secret"
 
@@ -76,17 +95,14 @@ func createUser(w http.ResponseWriter, r *http.Request) {
 	//
 
 	// ランダム文字列版
+	rand.Seed(time.Now().UnixNano())
 	var letter = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
 
 	b := make([]rune, 20)
 	for i := range b {
 		b[i] = letter[rand.Intn(len(letter))]
 	}
-	user.Token = string(b)
-	//
-
-	insertData(user)
-	fmt.Print(user)
+	return string(b)
 }
 
 // ヘッダーからx-tokenを受け取り、DB照会して合致したデータの名前を返す
@@ -117,7 +133,9 @@ func updateUser(w http.ResponseWriter, r *http.Request) {
 
 	var result string
 	if err := db.QueryRow("SELECT name FROM user WHERE token=?;", token).Scan(&result); err != nil && err != sql.ErrNoRows {
-		log.Fatal(err)
+		log.Fatalln(err)
+	} else if err == sql.ErrNoRows {
+		log.Fatalln("トークン", token, "は登録されていません -", err)
 	}
 
 	user := getUserData(w, r)
