@@ -98,7 +98,7 @@ func createToken() string {
 	rand.Seed(time.Now().UnixNano())
 	var letter = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
 
-	b := make([]rune, 1)
+	b := make([]rune, 20)
 	for i := range b {
 		b[i] = letter[rand.Intn(len(letter))]
 	}
